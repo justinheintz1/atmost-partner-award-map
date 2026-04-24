@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Atmost Partner Award Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: #0f172a;
+      color: #f1f5f9;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    #app-header {
+      height: 64px;
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      z-index: 1000;
+      flex-shrink: 0;
+    }
+
+    #branding {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+
+    #app-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #f8fafc;
+      letter-spacing: -0.02em;
+    }
+
+    #app-subtitle {
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    #search-container {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #airport-input {
+      width: 80px;
+      height: 36px;
+      background: #0f172a;
+      border: 1px solid #475569;
+      border-radius: 6px;
+      color: #f1f5f9;
+      font-size: 16px;
+      font-weight: 700;
+      text-align: center;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+
+    #airport-input:focus {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.3);
+    }
+
+    #search-btn {
+      height: 36px;
+      padding: 0 16px;
+      background: #6366f1;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+
+    #search-btn:hover { background: #4f46e5; }
+    #search-btn:active { background: #4338ca; }
+    #search-btn:disabled { background: #374151; cursor: not-allowed; opacity: 0.6; }
+
+    #error-msg {
+      font-size: 12px;
+      color: #f87171;
+      min-width: 180px;
+    }
+
+    /* ── Legend ── */
+    #legend {
+      height: 36px;
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 0 24px;
+      z-index: 999;
+      flex-shrink: 0;
+      overflow-x: auto;
+    }
+
+    .legend-item {
+      font-size: 11.5px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+      color: #94a3b8;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ── Map ── */
+    #map {
+      flex: 1;
+      z-index: 1;
+    }
+
+    /* ── Popups ── */
+    .leaflet-popup-content-wrapper {
+      background: #1e293b !important;
+      border: 1px solid #334155 !important;
+      border-radius: 10px !important;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+      padding: 0 !important;
+    }
+
+    .leaflet-popup-tip-container .leaflet-popup-tip {
+      background: #1e293b !important;
+    }
+
+    .leaflet-popup-content {
+      margin: 0 !important;
+      width: 230px !important;
+    }
+
+    .leaflet-popup-close-button {
+      color: #64748b !important;
+      top: 8px !important;
+      right: 10px !important;
+    }
+
+    .popup-content {
+      padding: 14px 16px 12px;
+    }
+
+    .popup-header {
+      border-bottom: 1px solid #334155;
+      padding-bottom: 9px;
+      margin-bottom: 10px;
+    }
+
+    .popup-iata {
+      font-size: 24px;
+      font-weight: 800;
+      color: #f8fafc;
+      display: block;
+      line-height: 1;
+      letter-spacing: -0.01em;
+    }
+
+    .popup-name {
+      font-size: 11px;
+      color: #94a3b8;
+      display: block;
+      margin-top: 3px;
+      line-height: 1.4;
+    }
+
+    .popup-origin-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #818cf8;
+      padding: 4px 0 2px;
+    }
+
+    .popup-distance {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .distance-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      color: #0f172a;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .distance-mi {
+      font-size: 12px;
+      color: #94a3b8;
+    }
+
+    .award-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    .award-table th {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #475569;
+      padding: 2px 0 4px;
+      text-align: left;
+      border-bottom: 1px solid #334155;
+    }
+
+    .award-table th:last-child { text-align: right; }
+
+    .award-table td {
+      padding: 4px 0;
+      color: #cbd5e1;
+    }
+
+    .award-table td:last-child {
+      text-align: right;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: #f1f5f9;
+    }
+
+    .award-table tr.highlight-row td {
+      color: #818cf8;
+    }
+
+    .popup-footer {
+      font-size: 10px;
+      color: #475569;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid #334155;
+    }
+
+    /* ── Origin marker ── */
+    .origin-marker {
+      background: transparent !important;
+      border: none !important;
+    }
+
+    .origin-pulse {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #6366f1;
+      border: 3px solid #f8fafc;
+      box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7);
+      animation: origin-pulse 2s infinite;
+    }
+
+    @keyframes origin-pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.7); }
+      70%  { box-shadow: 0 0 0 12px rgba(99, 102, 241, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+    }
+
+    /* ── Leaflet tile attribution tweak ── */
+    .leaflet-control-attribution {
+      background: rgba(15, 23, 42, 0.75) !important;
+      color: #64748b !important;
+    }
+
+    .leaflet-control-attribution a { color: #94a3b8 !important; }
+
+    /* ── Zoom control ── */
+    .leaflet-control-zoom a {
+      background: #1e293b !important;
+      color: #94a3b8 !important;
+      border-color: #334155 !important;
+    }
+    .leaflet-control-zoom a:hover {
+      background: #334155 !important;
+      color: #f1f5f9 !important;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="app-header">
+    <div id="branding">
+      <span id="app-title">Atmost Partner Award Map</span>
+      <span id="app-subtitle">Americas Zone</span>
+    </div>
+    <div id="search-container">
+      <input id="airport-input" type="text" placeholder="JFK" maxlength="3" autocomplete="off" spellcheck="false" />
+      <button id="search-btn">Show Rings</button>
+      <span id="error-msg"></span>
+    </div>
+  </div>
+
+  <div id="legend"></div>
+
+  <div id="map"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // ── Award band data ──────────────────────────────────────────────────────
+    const AWARD_BANDS = [
+      { label: '< 700 mi',       maxMiles:  700, color: '#22c55e', economy:  4500, premEco:  6000, business:  9000, first: 13500 },
+      { label: '701–1,400 mi',   maxMiles: 1400, color: '#84cc16', economy:  7500, premEco: 10000, business: 15000, first: 25000 },
+      { label: '1,401–2,100 mi', maxMiles: 2100, color: '#f59e0b', economy: 12500, premEco: 17500, business: 25000, first: 40000 },
+      { label: '2,101–4,000 mi', maxMiles: 4000, color: '#f97316', economy: 17500, premEco: 22500, business: 35000, first: 52500 },
+      { label: '4,001–6,000 mi', maxMiles: 6000, color: '#ef4444', economy: 25000, premEco: 32500, business: 50000, first: 75000 },
+      { label: '6,001+ mi',      maxMiles: Infinity, color: '#8b5cf6', economy: 30000, premEco: 40000, business: 60000, first: 90000 },
+    ];
+
+    const RING_MILES = [700, 1400, 2100, 4000, 6000];
+
+    // ── Airport dataset ──────────────────────────────────────────────────────
+    const AIRPORTS = [
+      // United States — Northeast
+      { iata: 'JFK', name: 'John F. Kennedy Intl, New York',      lat:  40.6413, lng:  -73.7781 },
+      { iata: 'LGA', name: 'LaGuardia, New York',                  lat:  40.7772, lng:  -73.8726 },
+      { iata: 'EWR', name: 'Newark Liberty Intl',                  lat:  40.6895, lng:  -74.1745 },
+      { iata: 'BOS', name: 'Boston Logan Intl',                    lat:  42.3656, lng:  -71.0096 },
+      { iata: 'PHL', name: 'Philadelphia Intl',                    lat:  39.8719, lng:  -75.2411 },
+      { iata: 'BWI', name: 'Baltimore/Washington Intl',            lat:  39.1754, lng:  -76.6683 },
+      { iata: 'DCA', name: 'Ronald Reagan Washington National',    lat:  38.8521, lng:  -77.0377 },
+      { iata: 'IAD', name: 'Dulles Intl',                          lat:  38.9445, lng:  -77.4558 },
+      { iata: 'BDL', name: 'Bradley Intl, Hartford/Springfield',  lat:  41.9389, lng:  -72.6832 },
+      { iata: 'PVD', name: 'Providence T.F. Green',                lat:  41.7236, lng:  -71.4282 },
+      { iata: 'BUF', name: 'Buffalo Niagara Intl',                 lat:  42.9405, lng:  -78.7322 },
+      { iata: 'SYR', name: 'Syracuse Hancock Intl',                lat:  43.1112, lng:  -76.1063 },
+      { iata: 'ALB', name: 'Albany Intl',                          lat:  42.7483, lng:  -73.8017 },
+      { iata: 'ROC', name: 'Greater Rochester Intl',               lat:  43.1189, lng:  -77.6724 },
+      // United States — Southeast
+      { iata: 'ATL', name: 'Hartsfield-Jackson Atlanta Intl',      lat:  33.6407, lng:  -84.4277 },
+      { iata: 'MIA', name: 'Miami Intl',                           lat:  25.7959, lng:  -80.2870 },
+      { iata: 'FLL', name: 'Fort Lauderdale-Hollywood Intl',       lat:  26.0726, lng:  -80.1527 },
+      { iata: 'MCO', name: 'Orlando Intl',                         lat:  28.4294, lng:  -81.3089 },
+      { iata: 'TPA', name: 'Tampa Intl',                           lat:  27.9755, lng:  -82.5332 },
+      { iata: 'CLT', name: 'Charlotte Douglas Intl',               lat:  35.2140, lng:  -80.9431 },
+      { iata: 'RDU', name: 'Raleigh-Durham Intl',                  lat:  35.8801, lng:  -78.7880 },
+      { iata: 'MSY', name: 'Louis Armstrong New Orleans Intl',     lat:  29.9934, lng:  -90.2580 },
+      { iata: 'JAX', name: 'Jacksonville Intl',                    lat:  30.4941, lng:  -81.6879 },
+      { iata: 'SAV', name: 'Savannah/Hilton Head Intl',            lat:  32.1276, lng:  -81.2021 },
+      { iata: 'CHS', name: 'Charleston Intl',                      lat:  32.8987, lng:  -80.0405 },
+      { iata: 'ORF', name: 'Norfolk Intl',                         lat:  36.8976, lng:  -76.0123 },
+      { iata: 'RIC', name: 'Richmond Intl',                        lat:  37.5052, lng:  -77.3197 },
+      { iata: 'PBI', name: 'Palm Beach Intl',                      lat:  26.6832, lng:  -80.0956 },
+      { iata: 'RSW', name: 'Southwest Florida Intl, Fort Myers',   lat:  26.5362, lng:  -81.7552 },
+      { iata: 'BNA', name: 'Nashville Intl',                       lat:  36.1245, lng:  -86.6782 },
+      { iata: 'MEM', name: 'Memphis Intl',                         lat:  35.0424, lng:  -89.9767 },
+      { iata: 'BHM', name: 'Birmingham-Shuttlesworth Intl',        lat:  33.5629, lng:  -86.7535 },
+      { iata: 'SHV', name: 'Shreveport Regional',                  lat:  32.4466, lng:  -93.8256 },
+      // United States — Midwest
+      { iata: 'ORD', name: "Chicago O'Hare Intl",                  lat:  41.9742, lng:  -87.9073 },
+      { iata: 'MDW', name: 'Chicago Midway Intl',                  lat:  41.7868, lng:  -87.7522 },
+      { iata: 'DTW', name: 'Detroit Metropolitan Wayne County',    lat:  42.2124, lng:  -83.3534 },
+      { iata: 'MSP', name: 'Minneapolis-Saint Paul Intl',          lat:  44.8848, lng:  -93.2223 },
+      { iata: 'STL', name: 'St. Louis Lambert Intl',               lat:  38.7487, lng:  -90.3700 },
+      { iata: 'MKE', name: 'Milwaukee Mitchell Intl',              lat:  42.9472, lng:  -87.8966 },
+      { iata: 'IND', name: 'Indianapolis Intl',                    lat:  39.7173, lng:  -86.2944 },
+      { iata: 'CMH', name: 'John Glenn Columbus Intl',             lat:  39.9980, lng:  -82.8919 },
+      { iata: 'CLE', name: 'Cleveland Hopkins Intl',               lat:  41.4117, lng:  -81.8498 },
+      { iata: 'PIT', name: 'Pittsburgh Intl',                      lat:  40.4915, lng:  -80.2329 },
+      { iata: 'CVG', name: 'Cincinnati/Northern Kentucky Intl',    lat:  39.0489, lng:  -84.6678 },
+      { iata: 'GRR', name: 'Gerald R. Ford Intl, Grand Rapids',   lat:  42.8808, lng:  -85.5228 },
+      { iata: 'DSM', name: 'Des Moines Intl',                      lat:  41.5340, lng:  -93.6631 },
+      { iata: 'OMA', name: 'Eppley Airfield, Omaha',               lat:  41.3032, lng:  -95.8941 },
+      { iata: 'MCI', name: 'Kansas City Intl',                     lat:  39.2976, lng:  -94.7139 },
+      { iata: 'MSN', name: 'Dane County Regional, Madison',        lat:  43.1399, lng:  -89.3375 },
+      // United States — South/Central
+      { iata: 'IAH', name: 'George Bush Intercontinental, Houston',lat:  29.9902, lng:  -95.3368 },
+      { iata: 'HOU', name: 'William P. Hobby, Houston',            lat:  29.6454, lng:  -95.2789 },
+      { iata: 'DFW', name: 'Dallas/Fort Worth Intl',               lat:  32.8998, lng:  -97.0403 },
+      { iata: 'DAL', name: 'Dallas Love Field',                    lat:  32.8471, lng:  -96.8518 },
+      { iata: 'AUS', name: 'Austin-Bergstrom Intl',                lat:  30.1945, lng:  -97.6699 },
+      { iata: 'SAT', name: 'San Antonio Intl',                     lat:  29.5337, lng:  -98.4698 },
+      { iata: 'ELP', name: 'El Paso Intl',                         lat:  31.8072, lng: -106.3779 },
+      { iata: 'OKC', name: 'Will Rogers World, Oklahoma City',     lat:  35.3931, lng:  -97.6007 },
+      { iata: 'TUL', name: 'Tulsa Intl',                           lat:  36.1984, lng:  -95.8881 },
+      { iata: 'LIT', name: 'Clinton National, Little Rock',        lat:  34.7294, lng:  -92.2243 },
+      { iata: 'ABQ', name: 'Albuquerque Intl Sunport',             lat:  35.0402, lng: -106.6090 },
+      // United States — West
+      { iata: 'LAX', name: 'Los Angeles Intl',                     lat:  33.9425, lng: -118.4081 },
+      { iata: 'SFO', name: 'San Francisco Intl',                   lat:  37.6213, lng: -122.3790 },
+      { iata: 'SEA', name: 'Seattle-Tacoma Intl',                  lat:  47.4502, lng: -122.3088 },
+      { iata: 'DEN', name: 'Denver Intl',                          lat:  39.8561, lng: -104.6737 },
+      { iata: 'PHX', name: 'Phoenix Sky Harbor Intl',              lat:  33.4373, lng: -112.0078 },
+      { iata: 'LAS', name: 'Harry Reid Intl, Las Vegas',           lat:  36.0840, lng: -115.1537 },
+      { iata: 'SAN', name: 'San Diego Intl',                       lat:  32.7338, lng: -117.1933 },
+      { iata: 'SLC', name: 'Salt Lake City Intl',                  lat:  40.7884, lng: -111.9778 },
+      { iata: 'PDX', name: 'Portland Intl',                        lat:  45.5898, lng: -122.5951 },
+      { iata: 'OAK', name: 'Oakland Intl',                         lat:  37.7213, lng: -122.2208 },
+      { iata: 'SJC', name: 'Norman Y. Mineta San Jose Intl',       lat:  37.3626, lng: -121.9290 },
+      { iata: 'BUR', name: 'Hollywood Burbank',                    lat:  34.2007, lng: -118.3585 },
+      { iata: 'SMF', name: 'Sacramento Intl',                      lat:  38.6954, lng: -121.5908 },
+      { iata: 'SNA', name: 'John Wayne, Orange County',            lat:  33.6757, lng: -117.8682 },
+      { iata: 'BOI', name: 'Boise Airport',                        lat:  43.5644, lng: -116.2228 },
+      { iata: 'RNO', name: 'Reno-Tahoe Intl',                      lat:  39.4991, lng: -119.7681 },
+      { iata: 'TUS', name: 'Tucson Intl',                          lat:  32.1161, lng: -110.9410 },
+      { iata: 'GEG', name: 'Spokane Intl',                         lat:  47.6199, lng: -117.5339 },
+      { iata: 'FAT', name: 'Fresno Yosemite Intl',                 lat:  36.7762, lng: -119.7182 },
+      // United States — Alaska / Hawaii
+      { iata: 'ANC', name: 'Ted Stevens Anchorage Intl',           lat:  61.1744, lng: -149.9961 },
+      { iata: 'FAI', name: 'Fairbanks Intl',                       lat:  64.8151, lng: -147.8561 },
+      { iata: 'JNU', name: 'Juneau Intl',                          lat:  58.3550, lng: -134.5763 },
+      { iata: 'HNL', name: 'Daniel K. Inouye Intl, Honolulu',     lat:  21.3187, lng: -157.9224 },
+      { iata: 'OGG', name: 'Kahului, Maui',                        lat:  20.8986, lng: -156.4305 },
+      { iata: 'KOA', name: 'Ellison Onizuka Kona Intl',            lat:  19.7388, lng: -156.0456 },
+      // Canada
+      { iata: 'YYZ', name: 'Toronto Pearson Intl',                 lat:  43.6777, lng:  -79.6248 },
+      { iata: 'YUL', name: 'Montréal-Trudeau Intl',                lat:  45.4706, lng:  -73.7408 },
+      { iata: 'YVR', name: 'Vancouver Intl',                       lat:  49.1947, lng: -123.1792 },
+      { iata: 'YYC', name: 'Calgary Intl',                         lat:  51.1215, lng: -114.0130 },
+      { iata: 'YEG', name: 'Edmonton Intl',                        lat:  53.3097, lng: -113.5797 },
+      { iata: 'YOW', name: 'Ottawa Macdonald-Cartier Intl',        lat:  45.3225, lng:  -75.6692 },
+      { iata: 'YHZ', name: 'Halifax Stanfield Intl',               lat:  44.8808, lng:  -63.5086 },
+      { iata: 'YWG', name: 'Winnipeg Richardson Intl',             lat:  49.9100, lng:  -97.2398 },
+      { iata: 'YYT', name: "St. John's Intl",                      lat:  47.6186, lng:  -52.7519 },
+      { iata: 'YQB', name: 'Québec City Jean Lesage Intl',         lat:  46.7911, lng:  -71.3933 },
+      // Mexico
+      { iata: 'MEX', name: 'Benito Juárez Intl, Mexico City',      lat:  19.4363, lng:  -99.0721 },
+      { iata: 'CUN', name: 'Cancún Intl',                          lat:  21.0365, lng:  -86.8771 },
+      { iata: 'GDL', name: 'Don Miguel Hidalgo, Guadalajara',      lat:  20.5218, lng: -103.3111 },
+      { iata: 'MTY', name: 'Monterrey Intl',                       lat:  25.7785, lng: -100.1069 },
+      { iata: 'SJD', name: 'Los Cabos Intl',                       lat:  23.1518, lng: -109.7210 },
+      { iata: 'PVR', name: 'Puerto Vallarta Intl',                 lat:  20.6801, lng: -105.2544 },
+      { iata: 'MZT', name: 'Mazatlán Intl',                        lat:  23.1613, lng: -106.2660 },
+      { iata: 'ZIH', name: 'Ixtapa/Zihuatanejo Intl',              lat:  17.6016, lng: -101.4605 },
+      { iata: 'CZM', name: 'Cozumel Intl',                         lat:  20.5224, lng:  -86.9256 },
+      { iata: 'HMO', name: 'Hermosillo Intl',                      lat:  29.0959, lng: -111.0479 },
+      { iata: 'TIJ', name: 'Tijuana Intl',                         lat:  32.5411, lng: -116.9702 },
+      { iata: 'OAX', name: 'Xoxocotlán Intl, Oaxaca',              lat:  17.0000, lng:  -96.7260 },
+      { iata: 'MID', name: 'Manuel Crescencio Rejón, Mérida',      lat:  20.9370, lng:  -89.6577 },
+      // Caribbean
+      { iata: 'SJU', name: 'Luis Muñoz Marín Intl, San Juan PR',   lat:  18.4394, lng:  -66.0018 },
+      { iata: 'SDQ', name: 'Las Américas Intl, Santo Domingo',     lat:  18.4297, lng:  -69.6689 },
+      { iata: 'HAV', name: 'José Martí Intl, Havana',              lat:  22.9892, lng:  -82.4091 },
+      { iata: 'MBJ', name: 'Sangster Intl, Montego Bay',           lat:  18.5037, lng:  -77.9133 },
+      { iata: 'KIN', name: 'Norman Manley Intl, Kingston',         lat:  17.9357, lng:  -76.7875 },
+      { iata: 'NAS', name: 'Lynden Pindling Intl, Nassau',         lat:  25.0390, lng:  -77.4662 },
+      { iata: 'GCM', name: 'Owen Roberts Intl, Grand Cayman',      lat:  19.2928, lng:  -81.3577 },
+      { iata: 'POS', name: 'Piarco Intl, Port of Spain',           lat:  10.5954, lng:  -61.3372 },
+      { iata: 'BGI', name: 'Grantley Adams Intl, Bridgetown',      lat:  13.0746, lng:  -59.4925 },
+      { iata: 'AUA', name: 'Queen Beatrix Intl, Aruba',            lat:  12.5014, lng:  -70.0152 },
+      { iata: 'CUR', name: 'Hato Intl, Curaçao',                   lat:  12.1889, lng:  -68.9598 },
+      { iata: 'STT', name: 'Cyril E. King, St. Thomas USVI',       lat:  18.3373, lng:  -64.9733 },
+      { iata: 'UVF', name: 'Hewanorra Intl, St. Lucia',            lat:  13.7332, lng:  -60.9526 },
+      // Central America
+      { iata: 'GUA', name: 'La Aurora Intl, Guatemala City',       lat:  14.5833, lng:  -90.5275 },
+      { iata: 'SAL', name: 'El Salvador Intl, San Salvador',       lat:  13.4409, lng:  -89.0557 },
+      { iata: 'TGU', name: 'Toncontín Intl, Tegucigalpa',          lat:  14.0608, lng:  -87.2172 },
+      { iata: 'MGA', name: 'Augusto C. Sandino Intl, Managua',     lat:  12.1415, lng:  -86.1682 },
+      { iata: 'SJO', name: 'Juan Santamaría Intl, San José',       lat:   9.9939, lng:  -84.2088 },
+      { iata: 'PTY', name: 'Tocumen Intl, Panama City',            lat:   9.0714, lng:  -79.3835 },
+      { iata: 'BZE', name: 'Philip S.W. Goldson Intl, Belize City',lat:  17.5391, lng:  -88.3082 },
+      // Colombia
+      { iata: 'BOG', name: 'El Dorado Intl, Bogotá',               lat:   4.7016, lng:  -74.1469 },
+      { iata: 'MDE', name: 'José María Córdova Intl, Medellín',    lat:   6.1645, lng:  -75.4231 },
+      { iata: 'CLO', name: 'Alfonso Bonilla Aragón, Cali',         lat:   3.5432, lng:  -76.3816 },
+      { iata: 'CTG', name: 'Rafael Núñez Intl, Cartagena',         lat:  10.4424, lng:  -75.5130 },
+      { iata: 'BAQ', name: 'Ernesto Cortissoz Intl, Barranquilla', lat:  10.8896, lng:  -74.7808 },
+      { iata: 'BGA', name: 'Palonegro Intl, Bucaramanga',          lat:   7.1265, lng:  -73.1848 },
+      // Venezuela / Ecuador / Peru
+      { iata: 'CCS', name: 'Simón Bolívar Intl, Caracas',          lat:  10.6031, lng:  -66.9913 },
+      { iata: 'UIO', name: 'Mariscal Sucre Intl, Quito',           lat:  -0.1292, lng:  -78.3575 },
+      { iata: 'GYE', name: 'José J. de Olmedo Intl, Guayaquil',    lat:  -2.1574, lng:  -79.8836 },
+      { iata: 'LIM', name: 'Jorge Chávez Intl, Lima',              lat: -12.0219, lng:  -77.1143 },
+      { iata: 'CUZ', name: 'Alejandro Velasco Astete Intl, Cusco', lat: -13.5357, lng:  -71.9388 },
+      // Brazil
+      { iata: 'GRU', name: 'São Paulo/Guarulhos Intl',             lat: -23.4356, lng:  -46.4731 },
+      { iata: 'GIG', name: 'Rio de Janeiro/Galeão Intl',           lat: -22.8099, lng:  -43.2506 },
+      { iata: 'BSB', name: 'Brasília Intl',                        lat: -15.8711, lng:  -47.9186 },
+      { iata: 'SSA', name: 'Luís Eduardo Magalhães Intl, Salvador',lat: -12.9086, lng:  -38.3225 },
+      { iata: 'FOR', name: 'Pinto Martins Intl, Fortaleza',        lat:  -3.7763, lng:  -38.5326 },
+      { iata: 'REC', name: 'Guararapes–Gilberto Freyre, Recife',   lat:  -8.1265, lng:  -34.9229 },
+      { iata: 'MAO', name: 'Eduardo Gomes Intl, Manaus',           lat:  -3.0386, lng:  -60.0497 },
+      { iata: 'POA', name: 'Salgado Filho Intl, Porto Alegre',     lat: -29.9944, lng:  -51.1714 },
+      { iata: 'CNF', name: 'Tancredo Neves Intl, Belo Horizonte',  lat: -19.6244, lng:  -43.9719 },
+      { iata: 'CWB', name: 'Afonso Pena Intl, Curitiba',           lat: -25.5285, lng:  -49.1758 },
+      // Bolivia / Paraguay / Uruguay
+      { iata: 'VVI', name: 'Viru Viru Intl, Santa Cruz',           lat: -17.6448, lng:  -63.1354 },
+      { iata: 'LPB', name: 'El Alto Intl, La Paz',                 lat: -16.5133, lng:  -68.1923 },
+      { iata: 'ASU', name: 'Silvio Pettirossi Intl, Asunción',     lat: -25.2400, lng:  -57.5200 },
+      { iata: 'MVD', name: 'Carrasco Intl, Montevideo',            lat: -34.8384, lng:  -56.0308 },
+      // Chile
+      { iata: 'SCL', name: 'Arturo Merino Benítez Intl, Santiago', lat: -33.3930, lng:  -70.7858 },
+      { iata: 'PMC', name: 'El Tepual Intl, Puerto Montt',         lat: -41.4389, lng:  -73.0940 },
+      { iata: 'PUQ', name: 'Carlos Ibáñez Intl, Punta Arenas',     lat: -53.0026, lng:  -70.8546 },
+      { iata: 'IQQ', name: 'Diego Aracena Intl, Iquique',          lat: -20.5353, lng:  -70.1813 },
+      { iata: 'ANF', name: 'Andrés Sabella Intl, Antofagasta',     lat: -23.4444, lng:  -70.4451 },
+      // Argentina
+      { iata: 'EZE', name: 'Ministro Pistarini Intl, Buenos Aires',lat: -34.8222, lng:  -58.5358 },
+      { iata: 'AEP', name: 'Jorge Newbery Aeroparque, Buenos Aires',lat:-34.5592, lng:  -58.4156 },
+      { iata: 'COR', name: 'Taravella Intl, Córdoba',              lat: -31.3236, lng:  -64.2080 },
+      { iata: 'MDZ', name: 'Gabrielli Intl, Mendoza',              lat: -32.8317, lng:  -68.7929 },
+      { iata: 'BRC', name: 'San Carlos de Bariloche Intl',         lat: -41.1512, lng:  -71.1575 },
+      { iata: 'USH', name: 'Malvinas Argentinas Intl, Ushuaia',    lat: -54.8433, lng:  -68.2958 },
+    ];
+
+    // ── Build legend ─────────────────────────────────────────────────────────
+    const legendEl = document.getElementById('legend');
+    AWARD_BANDS.forEach(band => {
+      const item = document.createElement('div');
+      item.className = 'legend-item';
+      item.innerHTML = `<span class="legend-dot" style="background:${band.color}"></span>${band.label}`;
+      legendEl.appendChild(item);
+    });
+
+    // ── Utility functions ─────────────────────────────────────────────────────
+    function haversineDistance(lat1, lng1, lat2, lng2) {
+      const R = 3958.8;
+      const toRad = d => d * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLng = toRad(lng2 - lng1);
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLng / 2) ** 2;
+      return R * 2 * Math.asin(Math.sqrt(a));
+    }
+
+    function getBand(distanceMiles) {
+      for (let i = 0; i < AWARD_BANDS.length; i++) {
+        if (distanceMiles <= AWARD_BANDS[i].maxMiles) return i;
+      }
+      return AWARD_BANDS.length - 1;
+    }
+
+    function fmt(n) { return n.toLocaleString(); }
+
+    function buildPopup(airport, distMiles, isOrigin, band) {
+      if (isOrigin) {
+        return `<div class="popup-content">
+          <div class="popup-header">
+            <span class="popup-iata">${airport.iata}</span>
+            <span class="popup-name">${airport.name}</span>
+          </div>
+          <div class="popup-origin-label">Origin Airport</div>
+        </div>`;
+      }
+      return `<div class="popup-content">
+        <div class="popup-header">
+          <span class="popup-iata">${airport.iata}</span>
+          <span class="popup-name">${airport.name}</span>
+        </div>
+        <div class="popup-distance">
+          <span class="distance-badge" style="background:${band.color}">${band.label}</span>
+          <span class="distance-mi">${Math.round(distMiles).toLocaleString()} mi</span>
+        </div>
+        <table class="award-table">
+          <thead><tr><th>Cabin</th><th>Miles (OW)</th></tr></thead>
+          <tbody>
+            <tr><td>Economy</td><td>${fmt(band.economy)}</td></tr>
+            <tr><td>Prem Economy</td><td>${fmt(band.premEco)}</td></tr>
+            <tr class="highlight-row"><td>Business</td><td>${fmt(band.business)}</td></tr>
+            <tr><td>First</td><td>${fmt(band.first)}</td></tr>
+          </tbody>
+        </table>
+        <div class="popup-footer">One-way · Atmost partner award · Taxes/fees extra</div>
+      </div>`;
+    }
+
+    // ── Map state ─────────────────────────────────────────────────────────────
+    let map = null;
+    let ringLayers = [];
+    let markerLayer = null;
+    let aaRoutes    = null; // Map<string, Set<string>> — AA nonstop routes by origin
+    let airportsMap = null; // Map<string, {name, city, lat, lng}> — from OpenFlights airports.dat
+
+    // ── Route + airport data ──────────────────────────────────────────────────
+    function setStatus(msg, isError = false) {
+      const el = document.getElementById('error-msg');
+      el.textContent = msg;
+      el.style.color = isError ? '#f87171' : '#94a3b8';
+    }
+
+    function parseCSVLine(line) {
+      const result = [];
+      let i = 0;
+      while (i < line.length) {
+        if (line[i] === '"') {
+          let val = '';
+          i++;
+          while (i < line.length) {
+            if (line[i] === '"' && line[i + 1] === '"') { val += '"'; i += 2; }
+            else if (line[i] === '"') { i++; break; }
+            else { val += line[i++]; }
+          }
+          result.push(val);
+          if (line[i] === ',') i++;
+        } else {
+          let val = '';
+          while (i < line.length && line[i] !== ',') val += line[i++];
+          result.push(val);
+          if (line[i] === ',') i++;
+        }
+      }
+      return result;
+    }
+
+    async function loadRouteData() {
+      const cachedRoutes   = localStorage.getItem('aaRoutes');
+      const cachedAirports = localStorage.getItem('aaAirports');
+      const cachedAt       = localStorage.getItem('aaRoutesAt');
+      if (cachedRoutes && cachedAirports && cachedAt && Date.now() - Number(cachedAt) < 86400000) {
+        aaRoutes    = new Map(JSON.parse(cachedRoutes).map(([k, v]) => [k, new Set(v)]));
+        airportsMap = new Map(JSON.parse(cachedAirports));
+        return;
+      }
+
+      const [routesText, airportsText] = await Promise.all([
+        fetch('https://raw.githubusercontent.com/jpatokal/openflights/master/data/routes.dat').then(r => r.text()),
+        fetch('https://raw.githubusercontent.com/jpatokal/openflights/master/data/airports.dat').then(r => r.text()),
+      ]);
+
+      // Parse AA nonstop routes
+      const routeMap = new Map();
+      for (const line of routesText.split('\n')) {
+        const f = line.split(',');
+        if (f.length < 9 || f[0] !== 'AA' || f[7] !== '0') continue;
+        const src = f[2], dst = f[4];
+        if (!routeMap.has(src)) routeMap.set(src, new Set());
+        routeMap.get(src).add(dst);
+      }
+
+      // Collect all IATA codes referenced in AA routes (origins + destinations)
+      const allIatas = new Set();
+      routeMap.forEach((dests, src) => { allIatas.add(src); dests.forEach(d => allIatas.add(d)); });
+
+      // Parse airports.dat — only keep airports in AA routes
+      const aMap = new Map();
+      for (const line of airportsText.split('\n')) {
+        if (!line.trim()) continue;
+        const f = parseCSVLine(line);
+        if (f.length < 8) continue;
+        const iata = f[4];
+        if (!iata || iata === '\\N' || !allIatas.has(iata)) continue;
+        const lat = parseFloat(f[6]), lng = parseFloat(f[7]);
+        if (isNaN(lat) || isNaN(lng)) continue;
+        aMap.set(iata, { name: f[1], city: f[2], lat, lng });
+      }
+
+      aaRoutes    = routeMap;
+      airportsMap = aMap;
+      localStorage.setItem('aaRoutes',   JSON.stringify([...routeMap.entries()].map(([k, v]) => [k, [...v]])));
+      localStorage.setItem('aaAirports', JSON.stringify([...aMap.entries()]));
+      localStorage.setItem('aaRoutesAt', String(Date.now()));
+    }
+
+    async function initMap() {
+      map = L.map('map', {
+        center: [20, -80],
+        zoom: 3,
+        zoomControl: true,
+        attributionControl: true,
+      });
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        maxZoom: 18,
+      }).addTo(map);
+
+      // Load AA route data before rendering
+      document.getElementById('airport-input').value = 'LGA';
+      document.getElementById('search-btn').disabled = true;
+      setStatus('Loading AA route data…');
+      try {
+        await loadRouteData();
+        setStatus('');
+      } catch (e) {
+        setStatus('Route data unavailable — showing all airports', true);
+      }
+      document.getElementById('search-btn').disabled = false;
+      renderOrigin('LGA');
+    }
+
+    function drawRings(lat, lng) {
+      ringLayers.forEach(l => map.removeLayer(l));
+      ringLayers = [];
+      RING_MILES.forEach((miles, i) => {
+        const circle = L.circle([lat, lng], {
+          radius: miles * 1609.344,
+          color: AWARD_BANDS[i].color,
+          weight: 1.5,
+          opacity: 0.55,
+          fillOpacity: 0,
+          dashArray: '6 5',
+        }).addTo(map);
+        ringLayers.push(circle);
+      });
+    }
+
+    function drawMarkers(originIata) {
+      if (markerLayer) markerLayer.clearLayers();
+      else markerLayer = L.layerGroup().addTo(map);
+
+      const originData = airportsMap ? airportsMap.get(originIata) : AIRPORTS.find(a => a.iata === originIata);
+      if (!originData) return;
+
+      // Draw origin marker
+      const icon = L.divIcon({
+        className: 'origin-marker',
+        html: '<div class="origin-pulse"></div>',
+        iconSize: [18, 18],
+        iconAnchor: [9, 9],
+      });
+      L.marker([originData.lat, originData.lng], { icon })
+        .bindPopup(buildPopup({ iata: originIata, name: originData.name || originData.city }, 0, true, null), { maxWidth: 260 })
+        .addTo(markerLayer);
+
+      // Draw AA nonstop destination markers
+      const dests = aaRoutes ? aaRoutes.get(originIata) : null;
+      if (!dests) return;
+
+      dests.forEach(destIata => {
+        const destData = airportsMap ? airportsMap.get(destIata) : AIRPORTS.find(a => a.iata === destIata);
+        if (!destData) return;
+        const distMiles = haversineDistance(originData.lat, originData.lng, destData.lat, destData.lng);
+        const band = AWARD_BANDS[getBand(distMiles)];
+        L.circleMarker([destData.lat, destData.lng], {
+          radius: 6,
+          fillColor: band.color,
+          color: '#1e293b',
+          weight: 1,
+          fillOpacity: 0.9,
+          opacity: 1,
+        })
+        .bindPopup(buildPopup({ iata: destIata, name: `${destData.city} (${destIata})` }, distMiles, false, band), { maxWidth: 260 })
+        .addTo(markerLayer);
+      });
+    }
+
+    function renderOrigin(iata) {
+      const origin = airportsMap ? airportsMap.get(iata) : AIRPORTS.find(a => a.iata === iata);
+      if (!origin) return false;
+      drawRings(origin.lat, origin.lng);
+      drawMarkers(iata);
+      map.setView([origin.lat, origin.lng], 3);
+      return true;
+    }
+
+    // ── Search handler ────────────────────────────────────────────────────────
+    function handleSearch() {
+      const raw = document.getElementById('airport-input').value.trim().toUpperCase();
+
+      if (!/^[A-Z]{3}$/.test(raw)) {
+        setStatus('Enter a 3-letter IATA code (e.g. JFK)', true);
+        return;
+      }
+      const found = airportsMap ? airportsMap.get(raw) : AIRPORTS.find(a => a.iata === raw);
+      if (!found) {
+        setStatus(`"${raw}" not found — try a major hub`, true);
+        return;
+      }
+      setStatus('');
+      renderOrigin(raw);
+      const dests = aaRoutes ? aaRoutes.get(raw) : null;
+      if (aaRoutes && (!dests || dests.size === 0)) {
+        setStatus(`No AA nonstop routes found from ${raw}`, true);
+      }
+    }
+
+    // ── Event wiring ──────────────────────────────────────────────────────────
+    const inputEl = document.getElementById('airport-input');
+    inputEl.addEventListener('input', e => {
+      e.target.value = e.target.value.toUpperCase();
+    });
+    inputEl.addEventListener('keydown', e => {
+      if (e.key === 'Enter') handleSearch();
+    });
+    document.getElementById('search-btn').addEventListener('click', handleSearch);
+
+    document.addEventListener('DOMContentLoaded', initMap);
+  </script>
+</body>
+</html>
